@@ -1,17 +1,11 @@
-const path = require('path');
-const { autoLoadModules } = require('../utils/autoLoader');
+import { OrderProcessingWorkflow } from "./order/workflow.js";
+import { UserRegistrationWorkflow } from "./user/workflow.js";
 
-// Auto-load all workflows from subdirectories
-const workflowsDir = path.join(__dirname, 'workflows');
+const allWorkflows = {
+  OrderProcessingWorkflow,
+  UserRegistrationWorkflow,
+};
 
-const allWorkflows = autoLoadModules(__dirname, 'workflows', /\.js$/);
+export default allWorkflows;
 
-// Export workflows object for Temporal worker
-module.exports = allWorkflows;
-
-// Also export individual workflows for direct access
-Object.keys(allWorkflows).forEach(key => {
-  module.exports[key] = allWorkflows[key];
-});
-
-console.log(`[Workflows] Total workflows loaded: ${Object.keys(allWorkflows).length}`);
+console.log("[Workflows] Total workflows loaded:", Object.keys(allWorkflows).length);

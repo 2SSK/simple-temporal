@@ -1,4 +1,4 @@
-const userController = require('../controllers/userController');
+import userController from '../controllers/userController.js';
 
 /**
  * User route configuration
@@ -7,7 +7,7 @@ const userController = require('../controllers/userController');
  */
 function userRoutes(app, temporalClient) {
   const basePath = '/api/users';
-  const taskQueue = process.env.USER_QUEUE || 'default_queue';
+  const taskQueue = process.env.DEFAULT_TASK_QUEUE || 'default_queue';
   
   // POST /api/users/register - Register new user
   app.post(`${basePath}/register`, async (req, res) => {
@@ -32,4 +32,4 @@ function userRoutes(app, temporalClient) {
   console.log(`[Routes] User routes registered: ${basePath}`);
 }
 
-module.exports = userRoutes;
+export default userRoutes;

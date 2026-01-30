@@ -57,24 +57,21 @@ const orderController = {
         taskQueue,
       );
 
-      const result = await workflowClient.execute({
+      // Start workflow without waiting for result
+      const workflow = await workflowClient.start({
         orderId,
         customerId,
         items,
         paymentMethod,
       });
 
-      res.status(201).json({
+      res.status(202).json({
         success: true,
-        message: "Order created successfully",
+        message: "Order workflow started",
         data: {
-          orderId: result.orderId,
-          status: result.status,
-          total: result.totals?.total,
-          transactionId: result.payment?.transactionId,
-          ...(result.status === "completed" && {
-            shipments: result.fulfillment?.shipments,
-          }),
+          workflowId: workflow.workflowId,
+          runId: workflow.runId,
+          status: "started"
         },
       });
     } catch (error) {
@@ -128,21 +125,25 @@ const orderController = {
    * @param {Object} res - Express response
    * @param {Object} temporalClient - Temporal client manager
    */
-  async listOrders(req, res, temporalClient) {
+   async listOrders(req, res, temporalClient) {
     try {
       const pageSize = parseInt(req.query.pageSize) || 10;
-      const workflows = await temporalClient.listWorkflows(
+      const result = await temporalClient.listWorkflows(
         `WorkflowType = "OrderProcessingWorkflow"`,
         pageSize,
       );
 
+      // Handle different response formats
+      const workflows = result.intoHistories || result.executions || result || [];
+      const workflowArray = Array.isArray(workflows) ? workflows : [];
+
       res.json({
-        count: workflows.length,
-        orders: workflows.map((wf) => ({
-          orderId: wf.workflowId,
-          status: wf.status,
-          startTime: wf.startTime,
-          runId: wf.runId,
+        count: workflowArray.length,
+        orders: workflowArray.map((wf) => ({
+          orderId: wf.workflowId || wf.execution?.workflowId,
+          status: wf.status || wf.workflowExecutionInfo?.status,
+          startTime: wf.startTime || wf.workflowExecutionInfo?.startTime,
+          runId: wf.runId || wf.execution?.runId,
         })),
       });
     } catch (error) {
@@ -195,4 +196,4 @@ const orderController = {
   },
 };
 
-module.exports = orderController;
+export default orderController;

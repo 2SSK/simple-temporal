@@ -1,27 +1,23 @@
-const activities = require('./activities');
-const workflows = require('./workflows');
+import { default as activities } from "./activities/index.js";
+import workflows from "./workflows/index.js";
 
-module.exports = {
+export {
   activities,
   workflows,
-  
-  // Helper to get workflow by name
-  getWorkflow(workflowName) {
-    return workflows[workflowName];
-  },
-  
-  // Helper to get activity by name
-  getActivity(activityName) {
-    return activities[activityName];
-  },
-  
-  // Get all registered workflow names
-  getWorkflowNames() {
-    return Object.keys(workflows);
-  },
-  
-  // Get all registered activity names
-  getActivityNames() {
-    return Object.keys(activities);
-  }
 };
+
+export function getWorkflow(workflowName) {
+  return workflows[workflowName];
+}
+
+export function getActivity(activityName) {
+  return activities[activityName];
+}
+
+export function getWorkflowNames() {
+  return Object.keys(workflows);
+}
+
+export function getActivityNames() {
+  return Object.keys(activities);
+}

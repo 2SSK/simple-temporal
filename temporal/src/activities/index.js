@@ -1,17 +1,11 @@
-const path = require('path');
-const { autoLoadModules } = require('../utils/autoLoader');
+import orderActivities from "./order/activities.js";
+import userActivities from "./user/activities.js";
 
-// Auto-load all activities from subdirectories
-const activitiesDir = path.join(__dirname, 'activities');
+const allActivities = {
+  ...orderActivities,
+  ...userActivities,
+};
 
-const allActivities = autoLoadModules(__dirname, 'activities', /\.js$/);
+export default allActivities;
 
-// Export activities object for Temporal worker
-module.exports = allActivities;
-
-// Also export individual activities for direct access
-Object.keys(allActivities).forEach(key => {
-  module.exports[key] = allActivities[key];
-});
-
-console.log(`[Activities] Total activities loaded: ${Object.keys(allActivities).length}`);
+console.log("[Activities] Total activities loaded:", Object.keys(allActivities).length);

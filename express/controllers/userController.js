@@ -52,33 +52,23 @@ const userController = {
         taskQueue
       );
       
-      const result = await workflowClient.execute({
+      // Start workflow without waiting for result
+      const workflow = await workflowClient.start({
         email,
         password,
         name,
         preferences
       });
       
-      if (result.status === 'failed') {
-        return res.status(400).json({
-          error: 'Registration failed',
-          message: result.error
-        });
-      }
-      
-      res.status(201).json({
+      res.status(202).json({
         success: true,
-        message: 'User registered successfully',
+        message: 'User registration workflow started',
         data: {
-          userId: result.userId,
-          email: result.email,
-          name: result.name,
-          status: result.status,
-          apiKey: result.apiKey,
-          preferences: result.preferences
+          workflowId: workflow.workflowId,
+          runId: workflow.runId,
+          status: 'started'
         },
-        // Warning about API key
-        warning: 'Store the API key securely. It will not be shown again.'
+        warning: 'API key will be available when workflow completes. Poll the workflow status to retrieve it.'
       });
     } catch (error) {
       console.error('[UserController] Error in registerUser:', error);
@@ -193,4 +183,4 @@ const userController = {
   }
 };
 
-module.exports = userController;
+export default userController;

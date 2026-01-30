@@ -9,10 +9,15 @@
     "worker": "node temporal/worker.js",
     "test": "jest"
   },
-  "keywords": ["express", "temporal", "workflows", "auto-loading"],
+  "keywords": [
+    "express",
+    "temporal",
+    "workflows",
+    "auto-loading"
+  ],
   "author": "SSK",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@temporalio/client": "^1.8.0",
     "@temporalio/worker": "^1.8.0",

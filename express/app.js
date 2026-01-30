@@ -1,5 +1,5 @@
-const express = require('express');
-const { loadRoutes } = require('./routes');
+import express from 'express';
+import { loadRoutes } from './routes/index.js';
 
 /**
  * Create and configure Express application
@@ -85,4 +85,4 @@ function createApp(temporalClient) {
   return app;
 }
 
-module.exports = createApp;
+export default createApp;

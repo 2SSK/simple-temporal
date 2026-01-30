@@ -1,4 +1,4 @@
-const orderController = require('../controllers/orderController');
+import orderController from '../controllers/orderController.js';
 
 /**
  * Order route configuration
@@ -7,7 +7,7 @@ const orderController = require('../controllers/orderController');
  */
 function orderRoutes(app, temporalClient) {
   const basePath = '/api/orders';
-  const taskQueue = process.env.ORDER_QUEUE || 'default_queue';
+  const taskQueue = process.env.DEFAULT_TASK_QUEUE || 'default_queue';
   
   // POST /api/orders - Create new order
   app.post(basePath, async (req, res) => {
@@ -32,4 +32,4 @@ function orderRoutes(app, temporalClient) {
   console.log(`[Routes] Order routes registered: ${basePath}`);
 }
 
-module.exports = orderRoutes;
+export default orderRoutes;

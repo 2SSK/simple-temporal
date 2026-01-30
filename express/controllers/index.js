@@ -1,11 +1,16 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Fix __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Auto-load all controller files from controllers directory
  * @returns {Object} Object with all loaded controllers
  */
-function loadControllers() {
+async function loadControllers() {
   const controllersPath = __dirname;
   
   const controllers = {};
@@ -19,7 +24,9 @@ function loadControllers() {
     const controllerPath = path.join(controllersPath, file);
     
     try {
-      const controllerModule = require(controllerPath);
+      // Use dynamic import for ES modules
+      const moduleUrl = `file://${controllerPath}`;
+      const controllerModule = await import(moduleUrl);
       
       // Handle default exports
       if (controllerModule && controllerModule.default) {
@@ -38,4 +45,4 @@ function loadControllers() {
   return controllers;
 }
 
-module.exports = { loadControllers };
+export { loadControllers };

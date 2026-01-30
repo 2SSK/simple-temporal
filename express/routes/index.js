@@ -1,12 +1,17 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Fix __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Auto-load all route files from routes directory
  * @param {Object} app - Express app instance
  * @param {Object} temporalClient - Temporal client manager
  */
-function loadRoutes(app, temporalClient) {
+async function loadRoutes(app, temporalClient) {
   const routesPath = __dirname;
   
   // Read all files in routes directory
@@ -21,7 +26,9 @@ function loadRoutes(app, temporalClient) {
     const routePath = path.join(routesPath, file);
     
     try {
-      const routeModule = require(routePath);
+      // Use dynamic import for ES modules
+      const moduleUrl = `file://${routePath}`;
+      const routeModule = await import(moduleUrl);
       
       if (typeof routeModule === 'function') {
         // Route module is a function that sets up routes
@@ -41,4 +48,4 @@ function loadRoutes(app, temporalClient) {
   console.log(`[Routes] Total routes loaded: ${routeFiles.length}`);
 }
 
-module.exports = { loadRoutes };
+export { loadRoutes };
