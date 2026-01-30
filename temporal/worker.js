@@ -1,9 +1,15 @@
 const { NativeConnection, Worker } = require('@temporalio/worker');
 const path = require('path');
 const temporalModule = require('./src');
+const { initializeRuntime, getMetricsConfig } = require('./runtime');
 
 async function run() {
   try {
+    // Initialize runtime with Prometheus metrics
+    initializeRuntime();
+    const metricsConfig = getMetricsConfig();
+    console.log(`[Worker] Metrics available at: ${metricsConfig.url}`);
+    
     const address = process.env.TEMPORAL_ADDRESS || 'localhost:7233';
     console.log(`[Worker] Connecting to Temporal at ${address}...`);
     

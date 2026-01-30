@@ -30,3 +30,13 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets: ['temporal-ui:8080']
+
+  # Temporal Worker SDK Metrics (scrapes from host machine)
+  - job_name: 'temporal-worker'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['host.docker.internal:9464']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'local-worker'
