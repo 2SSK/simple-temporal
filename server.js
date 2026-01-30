@@ -1,49 +1,60 @@
-import express from "express";
-import dotenv from "dotenv";
-import { Client, Connection } from "@temporalio/client";
+const dotenv = require('dotenv');
+const createApp = require('./express/app');
+const temporalClient = require('./temporal/client');
+
 dotenv.config();
 
-const app = express();
-app.use(express.json());
-
-let temporalClient;
-async function getTemporalClient() {
-  if (!temporalClient) {
-    const connection = await Connection.connect({
-      address: process.env.TEMPORAL_ADDRESS || "localhost:7233",
+async function startServer() {
+  try {
+    // Connect to Temporal
+    console.log('[Server] Starting...');
+    await temporalClient.connect();
+    console.log('[Server] Temporal connection established');
+    
+    // Create Express app
+    const app = createApp(temporalClient);
+    
+    // Start server
+    const port = process.env.PORT || 3000;
+    const host = process.env.HOST || 'localhost';
+    
+    const server = app.listen(port, host, () => {
+      console.log(`[Server] Running at http://${host}:${port}`);
+      console.log('[Server] Available endpoints:');
+      console.log('  - GET  /health');
+      console.log('  - GET  /api');
+      console.log('  - POST /api/greet');
+      console.log('  - GET  /api/greet/:id');
+      console.log('  - GET  /api/greet');
     });
-    temporalClient = new Client({
-      connection,
-      namespace: process.env.TEMPORAL_NAMESPACE || "default",
-    });
+    
+    // Graceful shutdown
+    const shutdown = async (signal) => {
+      console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+      
+      server.close(async () => {
+        console.log('[Server] HTTP server closed');
+        
+        await temporalClient.disconnect();
+        console.log('[Server] Temporal client disconnected');
+        
+        process.exit(0);
+      });
+      
+      // Force shutdown after 10 seconds
+      setTimeout(() => {
+        console.error('[Server] Forced shutdown after timeout');
+        process.exit(1);
+      }, 10000);
+    };
+    
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    
+  } catch (error) {
+    console.error('[Server] Failed to start:', error);
+    process.exit(1);
   }
-  return temporalClient;
 }
 
-app.get("/", (req, res) => {
-  res.json({ status: "Server is running" });
-});
-
-app.post("/greet", async (req, res) => {
-  const { name } = req.body || req.query;
-  if (!name) {
-    return res.status(400).json({ error: "Name is required" });
-  }
-  try {
-    const client = await getTemporalClient();
-    const workflow = await client.workflow.start("GreetWorkflow", {
-      workflowId: `greet-${Date.now()}`,
-      taskQueue: process.env.GREET_QUEUE || "greet_queue",
-      args: [{ name }],
-    });
-    const result = await workflow.result();
-    res.json({ greeting: result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`);
-});
+startServer();
