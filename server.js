@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import createApp from "./express/app";
-import temporalClient, { connect, disconnect } from "./temporal/client";
+import createApp from "./express/app.js";
+import temporalClient, { connect, disconnect } from "./temporal/client.js";
 
 config();
 
@@ -11,8 +11,8 @@ async function startServer() {
     await connect();
     console.log("[Server] Temporal connection established");
 
-    // Create Express app
-    const app = createApp(temporalClient);
+    // Create Express app (async)
+    const app = await createApp(temporalClient);
 
     // Start server
     const port = process.env.PORT || 3000;
@@ -23,9 +23,12 @@ async function startServer() {
       console.log("[Server] Available endpoints:");
       console.log("  - GET  /health");
       console.log("  - GET  /api");
-      console.log("  - POST /api/greet");
-      console.log("  - GET  /api/greet/:id");
-      console.log("  - GET  /api/greet");
+      console.log("  - POST /api/orders");
+      console.log("  - GET  /api/orders/:id");
+      console.log("  - GET  /api/orders");
+      console.log("  - POST /api/users/register");
+      console.log("  - GET  /api/users/:id");
+      console.log("  - GET  /api/users");
     });
 
     // Graceful shutdown

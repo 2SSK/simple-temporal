@@ -21,7 +21,8 @@ async function loadRoutes(app, temporalClient) {
   
   console.log(`[Routes] Found ${routeFiles.length} route files`);
   
-  for (const file of routeFiles) {
+  // Load all routes and wait for them to complete
+  const routePromises = routeFiles.map(async (file) => {
     const routeName = file.replace('.js', '');
     const routePath = path.join(routesPath, file);
     
@@ -30,20 +31,19 @@ async function loadRoutes(app, temporalClient) {
       const moduleUrl = `file://${routePath}`;
       const routeModule = await import(moduleUrl);
       
-      if (typeof routeModule === 'function') {
-        // Route module is a function that sets up routes
-        routeModule(app, temporalClient);
-        console.log(`[Routes] Loaded: /api/${routeName}`);
-      } else if (routeModule.default && typeof routeModule.default === 'function') {
+      if (routeModule.default && typeof routeModule.default === 'function') {
         routeModule.default(app, temporalClient);
         console.log(`[Routes] Loaded (default export): /api/${routeName}`);
       } else {
-        console.warn(`[Routes] ${file} does not export a function`);
+        console.warn(`[Routes] ${file} does not export a default function`);
       }
     } catch (error) {
       console.error(`[Routes] Failed to load ${file}:`, error.message);
     }
-  }
+  });
+  
+  // Wait for all routes to be loaded
+  await Promise.all(routePromises);
   
   console.log(`[Routes] Total routes loaded: ${routeFiles.length}`);
 }

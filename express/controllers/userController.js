@@ -121,31 +121,35 @@ const userController = {
    * @param {Object} res - Express response
    * @param {Object} temporalClient - Temporal client manager
    */
-  async listUsers(req, res, temporalClient) {
-    try {
-      const pageSize = parseInt(req.query.pageSize) || 10;
-      const workflows = await temporalClient.listWorkflows(
-        `WorkflowType = "UserRegistrationWorkflow"`,
-        pageSize
-      );
-      
-      res.json({
-        count: workflows.length,
-        users: workflows.map(wf => ({
-          workflowId: wf.workflowId,
-          status: wf.status,
-          startTime: wf.startTime,
-          runId: wf.runId
-        }))
-      });
-    } catch (error) {
-      console.error('[UserController] Error in listUsers:', error);
-      res.status(500).json({
-        error: 'Failed to list users',
-        message: error.message
-      });
-    }
-  },
+   async listUsers(req, res, temporalClient) {
+     try {
+       const pageSize = parseInt(req.query.pageSize) || 10;
+       const result = await temporalClient.listWorkflows(
+         `WorkflowType = "UserRegistrationWorkflow"`,
+         pageSize
+       );
+       
+       // Handle different response formats
+       const workflows = result.intoHistories || result.executions || result || [];
+       const workflowArray = Array.isArray(workflows) ? workflows : [];
+       
+       res.json({
+         count: workflowArray.length,
+         users: workflowArray.map(wf => ({
+           workflowId: wf.workflowId || wf.execution?.workflowId,
+           status: wf.status || wf.workflowExecutionInfo?.status,
+           startTime: wf.startTime || wf.workflowExecutionInfo?.startTime,
+           runId: wf.runId || wf.execution?.runId
+         }))
+       });
+     } catch (error) {
+       console.error('[UserController] Error in listUsers:', error);
+       res.status(500).json({
+         error: 'Failed to list users',
+         message: error.message
+       });
+     }
+   },
   
   /**
    * Suspend user

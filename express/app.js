@@ -4,9 +4,9 @@ import { loadRoutes } from './routes/index.js';
 /**
  * Create and configure Express application
  * @param {Object} temporalClient - Temporal client manager
- * @returns {Object} Configured Express app
+ * @returns {Promise<Object>} Configured Express app
  */
-function createApp(temporalClient) {
+async function createApp(temporalClient) {
   const app = express();
   
   // Middleware
@@ -60,8 +60,8 @@ function createApp(temporalClient) {
     });
   });
   
-  // Load all routes
-  loadRoutes(app, temporalClient);
+  // Load all routes (async)
+  await loadRoutes(app, temporalClient);
   
   // Error handling middleware
   app.use((err, req, res, next) => {
