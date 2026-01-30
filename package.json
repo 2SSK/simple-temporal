@@ -1,5 +1,5 @@
 {
-  "name": "express-temporal-starter",
+  "name": "simple-temporal",
   "version": "1.0.0",
   "description": "Express + Temporal workflow starter with auto-loading architecture",
   "main": "server.js",
