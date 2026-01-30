@@ -1,0 +1,17 @@
+apiVersion: 1
+
+# Delete datasources that match the given name before inserting those from the current config
+deleteDatasources:
+  - name: Prometheus
+
+# Insert/update datasources
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      httpMethod: GET
