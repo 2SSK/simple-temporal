@@ -924,7 +924,7 @@
             "value": "default"
           }
         ],
-        "query": "label_values(temporal_workflow_completed, namespace)",
+        "query": "label_values(temporal_worker_start, namespace)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -948,7 +948,7 @@
             "value": "default_queue"
           }
         ],
-        "query": "label_values(temporal_workflow_completed{namespace=\"$namespace\"}, task_queue)",
+        "query": "label_values(temporal_worker_start{namespace=\"$namespace\"}, task_queue)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
