@@ -1,6 +1,30 @@
 services:
-  # Temporal Server
+  # PostgreSQL - Persistence
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-14-alpine}
+    container_name: temporal-postgresql
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-temporal}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_DB=${POSTGRES_DB:-temporal}
+    ports:
+      - "5433:5432"
+    networks:
+      - temporal-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-temporal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+    # Temporal Server
   temporal:
+    depends_on:
+      postgres:
+        condition: service_healthy
     image: temporalio/auto-setup:${TEMPORAL_VERSION:-1.24.0}
     container_name: temporal-server
     env_file:
@@ -15,7 +39,7 @@ services:
     networks:
       - temporal-network
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7233"]
+      test: ["CMD-SHELL", "ps aux | grep temporal-server"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -89,7 +113,8 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      test:
+        ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -102,6 +127,8 @@ volumes:
   prometheus-data:
     driver: local
   grafana-data:
+    driver: local
+  postgres-data:
     driver: local
 
 # Network Configuration
