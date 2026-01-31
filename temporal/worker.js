@@ -17,6 +17,7 @@ async function run() {
     workflowsPath: join(__dirname, "src/workflows"),
     activities,
     taskQueue: temporal.taskQueue,
+    namespace: temporal.namespace,
   });
 
   logger.info("Temporal worker started");
