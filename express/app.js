@@ -23,9 +23,9 @@ async function createApp(temporalClient) {
         env: server.env,
       },
       temporal: {
-        connected: temporalClient.isConnected(),
         address: temporal.address,
         namespace: temporal.namespace,
+        taskQueue: temporal.taskQueue,
       },
     });
   });

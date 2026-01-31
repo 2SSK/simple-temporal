@@ -1,2 +1,2 @@
-export { greetWorkflow } from "./greet.workflow.js";
-export * from "./farewell.workflow.js";
+export { OrderProcessingWorkflow, OrderCancellationWorkflow } from "./order.workflow.js";
+export { UserRegistrationWorkflow, UserSuspensionWorkflow } from "./user.workflow.js";

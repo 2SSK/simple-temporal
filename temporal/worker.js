@@ -18,6 +18,9 @@ async function run() {
     activities,
     taskQueue: temporal.taskQueue,
     namespace: temporal.namespace,
+    bundlerOptions: {
+      ignoreModules: ["crypto", "buffer", "string_decoder", "zlib", "fs", "path", "os", "http", "https", "events"],
+    },
   });
 
   temporalLogger("worker").info("Temporal worker started");
