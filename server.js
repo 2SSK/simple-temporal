@@ -15,15 +15,6 @@ async function startServer() {
     // Start server
     const httpServer = app.listen(server.port, server.host, () => {
       logger.info(`Server running at http://${server.host}:${server.port}`);
-      logger.info("Available endpoints:");
-      logger.info("  - GET  /health");
-      logger.info("  - GET  /api");
-      logger.info("  - POST /api/orders");
-      logger.info("  - GET  /api/orders/:id");
-      logger.info("  - GET  /api/orders");
-      logger.info("  - POST /api/users/register");
-      logger.info("  - GET  /api/users/:id");
-      logger.info("  - GET  /api/users");
     });
 
     // Graceful shutdown
@@ -45,7 +36,10 @@ async function startServer() {
     process.on("SIGTERM", () => shutdown("SIGTERM"));
     process.on("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
-    logger.error("Failed to start server", { error: error.message, stack: error.stack });
+    logger.error("Failed to start server", {
+      error: error.message,
+      stack: error.stack,
+    });
     process.exit(1);
   }
 }

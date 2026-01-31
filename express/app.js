@@ -31,7 +31,7 @@ async function createApp(temporalClient) {
   });
 
   // Mount API router for all other endpoints
-  app.use(apiRouter);
+  app.use("/api", apiRouter);
 
   // Error handling middleware
   app.use((err, req, res, next) => {
