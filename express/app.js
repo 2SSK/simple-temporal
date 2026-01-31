@@ -1,5 +1,7 @@
 import express from "express";
-import { loadRoutes } from "./routes/index.js";
+import { temporal, server } from "../utils/config.js";
+import logger from "../utils/logger.js";
+import apiRouter from "./router.js";
 
 async function createApp(temporalClient) {
   const app = express();
@@ -8,72 +10,67 @@ async function createApp(temporalClient) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Request logging middleware
-  app.use((req, res, next) => {
-    console.log(`[HTTP] ${req.method} ${req.path}`);
-    next();
-  });
-
-  // Health check endpoint
+  // Health check endpoint (standalone for simple health checks)
   app.get("/health", (req, res) => {
+    logger.info("Health check requested");
     res.json({
       status: "healthy",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      server: {
+        port: server.port,
+        host: server.host,
+        env: server.env,
+      },
       temporal: {
         connected: temporalClient.isConnected(),
+        address: temporal.address,
+        namespace: temporal.namespace,
       },
     });
   });
 
-  // API info endpoint
-  app.get("/api", (req, res) => {
-    res.json({
-      name: "Express + Temporal API",
-      version: "1.0.0",
-      status: "running",
-      temporal: {
-        connected: temporalClient.isConnected(),
-        namespace: process.env.TEMPORAL_NAMESPACE || "default",
-      },
-      endpoints: {
-        health: "GET /health",
-        api: "GET /api",
-        orders: {
-          create: "POST /api/orders",
-          get: "GET /api/orders/:id",
-          list: "GET /api/orders",
-          cancel: "POST /api/orders/:id/cancel",
-        },
-        users: {
-          register: "POST /api/users/register",
-          get: "GET /api/users/:id",
-          list: "GET /api/users",
-          suspend: "POST /api/users/:id/suspend",
-        },
-      },
-    });
-  });
-
-  // Load all routes (async)
-  await loadRoutes(app, temporalClient);
+  // Mount API router for all other endpoints
+  app.use(apiRouter);
 
   // Error handling middleware
   app.use((err, req, res, next) => {
-    console.error("[Error]", err);
+    logger.error("Express error handler", {
+      error: err.message,
+      stack: err.stack,
+      method: req.method,
+      url: req.url,
+    });
+
     res.status(500).json({
-      error: "Internal server error",
-      message: err.message,
-      ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+      success: false,
+      error: {
+        type: "internal_server_error",
+        message: "Internal server error",
+        ...(server.env === "development" && {
+          message: err.message,
+          stack: err.stack,
+        }),
+      },
+      timestamp: new Date().toISOString(),
     });
   });
 
   // 404 handler
   app.use((req, res) => {
+    logger.warn("Route not found", {
+      method: req.method,
+      url: req.url,
+    });
+
     res.status(404).json({
-      error: "Not found",
-      message: `Route ${req.method} ${req.path} not found`,
-      availableRoutes: ["/health", "/api", "/api/orders", "/api/users"],
+      success: false,
+      error: {
+        type: "not_found",
+        message: `Route ${req.method} ${req.path} not found`,
+        availableRoutes: ["/health", "/api", "/api/orders", "/api/users"],
+      },
+      timestamp: new Date().toISOString(),
     });
   });
 

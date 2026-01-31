@@ -1,5 +1,5 @@
 import { Connection, Client } from "@temporalio/client";
-import { temporal } from "./utils/config";
+import { temporal } from "../utils/config.js";
 
 let client = null;
 

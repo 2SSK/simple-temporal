@@ -1,4 +1,6 @@
-import logger from "../../utils/logger.js";
+import { createContextLogger } from "../../../utils/logger.js";
+
+const logger = createContextLogger("farewellActivity");
 
 async function farewell(name) {
   logger.info(`Saying farewell to ${name}`);

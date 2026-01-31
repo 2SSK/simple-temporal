@@ -12,8 +12,21 @@ export const prometheus = {
   bindAddress: process.env.PROMETHEUS_BIND_ADDRESS || "0.0.0.0",
 };
 
+export const server = {
+  port: parseInt(process.env.PORT || "3000", 10),
+  host: process.env.HOST || "localhost",
+  env: process.env.NODE_ENV || "development",
+};
+
 export const logging = {
   level: process.env.LOG_LEVEL || "info",
   coreLevel: process.env.TEMPORAL_LOG_LEVEL_CORE || "INFO",
   otherLevel: process.env.TEMPORAL_LOG_LEVEL_OTHER || "INFO",
+};
+
+export default {
+  temporal,
+  prometheus,
+  server,
+  logging,
 };

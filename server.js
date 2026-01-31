@@ -1,52 +1,43 @@
-import { config } from "dotenv";
 import createApp from "./express/app.js";
-import temporalClient, { connect, disconnect } from "./temporal/client.js";
+import { server } from "./utils/config.js";
+import { createContextLogger } from "./utils/logger.js";
+import temporalClient from "./temporal/client.js";
 
-config();
+const logger = createContextLogger("server");
 
 async function startServer() {
   try {
-    // Connect to Temporal
-    console.log("[Server] Starting...");
-    await connect();
-    console.log("[Server] Temporal connection established");
+    logger.info("Starting server...");
 
     // Create Express app (async)
     const app = await createApp(temporalClient);
 
     // Start server
-    const port = process.env.PORT || 3000;
-    const host = process.env.HOST || "localhost";
-
-    const server = app.listen(port, host, () => {
-      console.log(`[Server] Running at http://${host}:${port}`);
-      console.log("[Server] Available endpoints:");
-      console.log("  - GET  /health");
-      console.log("  - GET  /api");
-      console.log("  - POST /api/orders");
-      console.log("  - GET  /api/orders/:id");
-      console.log("  - GET  /api/orders");
-      console.log("  - POST /api/users/register");
-      console.log("  - GET  /api/users/:id");
-      console.log("  - GET  /api/users");
+    const httpServer = app.listen(server.port, server.host, () => {
+      logger.info(`Server running at http://${server.host}:${server.port}`);
+      logger.info("Available endpoints:");
+      logger.info("  - GET  /health");
+      logger.info("  - GET  /api");
+      logger.info("  - POST /api/orders");
+      logger.info("  - GET  /api/orders/:id");
+      logger.info("  - GET  /api/orders");
+      logger.info("  - POST /api/users/register");
+      logger.info("  - GET  /api/users/:id");
+      logger.info("  - GET  /api/users");
     });
 
     // Graceful shutdown
     const shutdown = async (signal) => {
-      console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+      logger.info(`Received ${signal}. Shutting down gracefully...`);
 
-      server.close(async () => {
-        console.log("[Server] HTTP server closed");
-
-        await disconnect();
-        console.log("[Server] Temporal client disconnected");
-
+      httpServer.close(async () => {
+        logger.info("HTTP server closed");
         process.exit(0);
       });
 
       // Force shutdown after 10 seconds
       setTimeout(() => {
-        console.error("[Server] Forced shutdown after timeout");
+        logger.error("Forced shutdown after timeout");
         process.exit(1);
       }, 10000);
     };
@@ -54,7 +45,7 @@ async function startServer() {
     process.on("SIGTERM", () => shutdown("SIGTERM"));
     process.on("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
-    console.error("[Server] Failed to start:", error);
+    logger.error("Failed to start server", { error: error.message, stack: error.stack });
     process.exit(1);
   }
 }

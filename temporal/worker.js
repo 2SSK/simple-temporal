@@ -2,8 +2,8 @@ import { Worker } from "@temporalio/worker";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import * as activities from "./src/activities/index.js";
-import { temporal } from "./utils/config.js";
-import logger from "./utils/logger.js";
+import { temporal } from "../utils/config.js";
+import { temporalLogger } from "../utils/logger.js";
 import initTelemetry from "./utils/telemetry.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,11 +20,11 @@ async function run() {
     namespace: temporal.namespace,
   });
 
-  logger.info("Temporal worker started");
+  temporalLogger("worker").info("Temporal worker started");
   await worker.run();
 }
 
 run().catch((err) => {
-  logger.error("Worker failed:", err);
+  temporalLogger("worker").error("Worker failed:", err);
   process.exit(1);
 });
