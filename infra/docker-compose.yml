@@ -1,0 +1,472 @@
+# =============================================================================
+# Temporal Workflow Infrastructure Stack
+# Optimized for development with production-grade configurations
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database - Primary persistence layer for Temporal
+  # ===========================================================================
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-17.2-alpine3.21}
+    container_name: temporal-postgres
+    hostname: postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-temporal}
+      POSTGRES_USER: ${POSTGRES_USER:-temporal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+
+    networks:
+      - temporal-network
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-temporal} -d ${POSTGRES_DB:-temporal}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "${POSTGRES_CPU_LIMIT:-1.0}"
+          memory: ${POSTGRES_MEM_LIMIT:-1g}
+        reservations:
+          cpus: "0.5"
+          memory: 512m
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Temporal Server - Workflow orchestration engine
+  # ===========================================================================
+  temporal:
+    image: temporalio/auto-setup:${TEMPORAL_VERSION:-1.25.2}
+    container_name: temporal-server
+    hostname: temporal
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      # Database configuration
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-temporal}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_SEEDS: postgres
+      SKIP_DB_CREATE: "false"
+      SKIP_SCHEMA_SETUP: "false"
+
+      # Temporal configuration
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/config/dynamicconfig/development.yaml
+      ENABLE_ES: "false"
+      ES_SEEDS: ""
+
+      # Metrics configuration
+      PROMETHEUS_ENDPOINT: "0.0.0.0:9090"
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # Temporal specific settings
+      NUM_HISTORY_SHARDS: 4
+      BIND_ON_IP: "0.0.0.0"
+
+    ports:
+      - "7233:7233" # gRPC endpoint
+      - "7234:7234" # Membership port
+      - "7235:7235" # History service
+      - "7239:7239" # Worker service
+      - "9090:9090" # Prometheus metrics
+
+    volumes:
+      - ./config/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+
+    networks:
+      - temporal-network
+
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "${TEMPORAL_CPU_LIMIT:-2.0}"
+          memory: ${TEMPORAL_MEM_LIMIT:-2g}
+        reservations:
+          cpus: "1.0"
+          memory: 1g
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Temporal Admin Tools - CLI tools for debugging and administration
+  # ===========================================================================
+  temporal-admin-tools:
+    image: temporalio/admin-tools:${TEMPORAL_ADMIN_TOOLS_VERSION:-1.25.2-tctl-1.18.1-cli-1.1.1}
+    container_name: temporal-admin-tools
+    hostname: temporal-admin-tools
+    restart: unless-stopped
+
+    depends_on:
+      temporal:
+        condition: service_healthy
+
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CLI_ADDRESS: temporal:7233
+
+    networks:
+      - temporal-network
+
+    stdin_open: true
+    tty: true
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ===========================================================================
+  # Temporal Web UI - Web interface for workflow visualization
+  # ===========================================================================
+  temporal-ui:
+    image: temporalio/ui:${TEMPORAL_UI_VERSION:-2.30.2}
+    container_name: temporal-ui
+    hostname: temporal-ui
+    restart: unless-stopped
+
+    depends_on:
+      temporal:
+        condition: service_healthy
+
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000,http://localhost:8080
+      TEMPORAL_TLS_ENABLE_HOST_VERIFICATION: "false"
+      TEMPORAL_PERMIT_WRITE_API: "true"
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - temporal-network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ===========================================================================
+  # Prometheus - Metrics collection and storage
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.55.1}
+    container_name: temporal-prometheus
+    hostname: prometheus
+    restart: unless-stopped
+
+    depends_on:
+      temporal:
+        condition: service_healthy
+
+    user: "nobody"
+
+    ports:
+      - "9091:9090"
+
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=10GB"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+      - "--log.level=info"
+
+    networks:
+      - temporal-network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/-/healthy",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "${PROMETHEUS_CPU_LIMIT:-0.5}"
+          memory: ${PROMETHEUS_MEM_LIMIT:-512m}
+        reservations:
+          cpus: "0.25"
+          memory: 256m
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # OpenTelemetry Collector - Telemetry data pipeline
+  # ===========================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.115.1}
+    container_name: temporal-otel-collector
+    hostname: otel-collector
+    restart: unless-stopped
+
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "8888:8888" # Prometheus metrics exposed by the collector
+      - "8889:8889" # Prometheus exporter metrics
+      - "13133:13133" # Health check extension
+      - "9464:9464" # Prometheus exporter
+
+    volumes:
+      - ./monitoring/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+    environment:
+      GOGC: "80"
+
+    command:
+      - "--config=/etc/otelcol-contrib/config.yaml"
+
+    networks:
+      - temporal-network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:13133/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "${OTEL_COLLECTOR_CPU_LIMIT:-0.5}"
+          memory: ${OTEL_COLLECTOR_MEM_LIMIT:-256m}
+        reservations:
+          cpus: "0.25"
+          memory: 128m
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Grafana - Metrics visualization and dashboarding
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION:-11.3.1}
+    container_name: temporal-grafana
+    hostname: grafana
+    restart: unless-stopped
+
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+    user: "472" # Grafana user
+
+    ports:
+      - "3003:3000"
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+    environment:
+      # Security
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SECURE: "false"
+      GF_SECURITY_COOKIE_SAMESITE: "lax"
+
+      # Users
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_USERS_AUTO_ASSIGN_ORG: "true"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: "Viewer"
+
+      # Anonymous access (disable in production)
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+
+      # Server
+      GF_SERVER_ROOT_URL: "http://localhost:3003"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+
+      # Logging
+      GF_LOG_LEVEL: ${LOG_LEVEL:-info}
+      GF_LOG_MODE: "console"
+
+      # Paths
+      GF_PATHS_PROVISIONING: "/etc/grafana/provisioning"
+
+      # Dashboards
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/temporal-overview.json"
+
+    networks:
+      - temporal-network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "${GRAFANA_CPU_LIMIT:-0.5}"
+          memory: ${GRAFANA_MEM_LIMIT:-256m}
+        reservations:
+          cpus: "0.25"
+          memory: 128m
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Named Volumes - Persistent data storage
+# =============================================================================
+volumes:
+  postgres_data:
+    name: temporal-postgres-data
+    driver: local
+
+  prometheus_data:
+    name: temporal-prometheus-data
+    driver: local
+
+  grafana_data:
+    name: temporal-grafana-data
+    driver: local
+
+# =============================================================================
+# Networks - Isolated network for all services
+# =============================================================================
+networks:
+  temporal-network:
+    name: ${NETWORK_NAME:-temporal-network}
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

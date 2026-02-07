@@ -1,0 +1,309 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "title": "Temporal Worker Observability",
+  "tags": ["temporal", "workflows", "activities"],
+  "timezone": "browser",
+  "schemaVersion": 27,
+  "version": 0,
+  "refresh": "10s",
+  "uid": "temporal-worker-observability",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Activity Execution Latency (P95)",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(temporal_activity_execution_latency_milliseconds_bucket[5m]))",
+          "legendFormat": "{{activity_type}} | Queue: {{task_queue}} | P95",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "ms", "label": "Latency" }, { "format": "short" }]
+    },
+    {
+      "id": 2,
+      "title": "Workflow End-to-End Latency (P95)",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(temporal_workflow_endtoend_latency_milliseconds_bucket[5m]))",
+          "legendFormat": "{{workflow_type}} | Queue: {{task_queue}} | P95",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "ms", "label": "Latency" }, { "format": "short" }]
+    },
+    {
+      "id": 3,
+      "title": "Worker Task Slots Used",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "temporal_worker_task_slots_used",
+          "legendFormat": "{{task_queue}} | {{worker_type}} | Used",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "short", "label": "Slots Used" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Worker Task Slots Available",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "temporal_worker_task_slots_available",
+          "legendFormat": "{{task_queue}} | {{worker_type}} | Available",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "short", "label": "Slots Available" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Worker Utilization %",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "(temporal_worker_task_slots_used / (temporal_worker_task_slots_used + temporal_worker_task_slots_available)) * 100",
+          "legendFormat": "{{task_queue}} | {{worker_type}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "percent", "label": "Utilization", "max": 100, "min": 0 },
+        { "format": "short" }
+      ],
+      "alert": {
+        "conditions": [
+          {
+            "evaluator": { "params": [80], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "avg" },
+            "type": "query"
+          }
+        ],
+        "executionErrorState": "alerting",
+        "frequency": "60s",
+        "handler": 1,
+        "name": "Worker Utilization Alert",
+        "noDataState": "no_data",
+        "notifications": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Activity Execution Rate",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(temporal_activity_execution_latency_milliseconds_count[5m])",
+          "legendFormat": "{{activity_type}} | Queue: {{task_queue}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "ops", "label": "Executions/sec" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Temporal Server Request Latency (P99)",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(temporal_request_latency_milliseconds_bucket[5m]))",
+          "legendFormat": "{{operation}} | P99",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "ms", "label": "Latency" }, { "format": "short" }]
+    },
+    {
+      "id": 8,
+      "title": "Activity Schedule-to-Start Latency",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(temporal_activity_schedule_to_start_latency_milliseconds_bucket[5m]))",
+          "legendFormat": "{{task_queue}} | Queue Wait | P95",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "ms", "label": "Queue Wait Time" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Workflow Completion Rate",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "rate(temporal_workflow_completed_total[5m])",
+          "legendFormat": "{{workflow_type}} | Completions",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "ops", "label": "Workflows/sec" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Long Poll Request Rate",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "expr": "rate(temporal_long_request_total[5m])",
+          "legendFormat": "{{operation}} | Queue: {{task_queue}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "ops", "label": "Requests/sec" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Worker Slot Capacity",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "temporal_worker_task_slots_available + temporal_worker_task_slots_used",
+          "legendFormat": "Total Slots | {{task_queue}} | {{slot_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "temporal_worker_task_slots_used",
+          "legendFormat": "Used Slots | {{task_queue}} | {{slot_type}}",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [
+        { "format": "short", "label": "Slot Count" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "Task Queue Backlog Metrics",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "targets": [
+        {
+          "expr": "approximate_backlog_count{namespace=\"default\"}",
+          "legendFormat": "Backlog Count | {{taskqueue}} | {{task_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "approximate_backlog_age_seconds{namespace=\"default\"}",
+          "legendFormat": "Backlog Age (s) | {{taskqueue}} | {{task_type}}",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [
+        { "format": "short", "label": "Backlog Count / Age (s)" },
+        { "format": "short" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Task Queue Poll Rates",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "rate(temporal_workflow_task_queue_poll_succeed_total[5m])",
+          "legendFormat": "Workflow Poll Success | {{task_queue}}",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(temporal_workflow_task_queue_poll_empty_total[5m])",
+          "legendFormat": "Workflow Poll Empty | {{task_queue}}",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(temporal_activity_task_received_total[5m])",
+          "legendFormat": "Activity Tasks Received | {{task_queue}}",
+          "refId": "C"
+        }
+      ],
+      "yaxes": [
+        { "format": "ops", "label": "Polls/sec" },
+        { "format": "short" }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  }
+}

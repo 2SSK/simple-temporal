@@ -1,0 +1,21 @@
+# =============================================================================
+# Grafana Dashboard Provisioning Configuration
+# =============================================================================
+# This configuration automatically loads dashboards from the specified paths
+# when Grafana starts up.
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  # Temporal dashboard provider
+  - name: 'Temporal Dashboards'
+    orgId: 1
+    folder: 'Temporal'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

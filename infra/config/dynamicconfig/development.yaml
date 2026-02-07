@@ -1,0 +1,192 @@
+# =============================================================================
+# Temporal Dynamic Configuration - Development Environment
+# =============================================================================
+# Dynamic configuration allows runtime updates without server restart.
+# These settings are specifically tuned for development environments.
+# =============================================================================
+
+# Workflow Execution Limits
+# -----------------------------------------------------------------------------
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
+
+limit.maxWorkflowTimeout:
+  - value: 2592000  # 30 days in seconds
+    constraints: {}
+
+limit.maxActivityTimeout:
+  - value: 86400  # 24 hours in seconds
+    constraints: {}
+
+# Search Attributes Configuration
+# -----------------------------------------------------------------------------
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true  # Dev setup only - DO NOT enable in production
+    constraints: {}
+
+# Metrics Configuration
+# -----------------------------------------------------------------------------
+global.metrics.prometheus.framework:
+  - value: opentelemetry
+    constraints: {}
+
+global.metrics.prometheus.listenAddress:
+  - value: "0.0.0.0:9090"
+    constraints: {}
+
+global.metrics.prometheus.tls:
+  - value: false
+    constraints: {}
+
+# Enable comprehensive metrics for monitoring
+global.metrics.perUnitHistogramBoundaries:
+  - value: true
+    constraints: {}
+
+# Task Queue Configuration
+# -----------------------------------------------------------------------------
+matching.numTaskqueueReadPartitions:
+  - value: 4
+    constraints: {}
+
+matching.numTaskqueueWritePartitions:
+  - value: 4
+    constraints: {}
+
+# Enable task queue user data for better debugging
+visibility.enableTaskQueueUserData:
+  - value: true
+    constraints: {}
+
+# Workflow Execution Configuration
+# -----------------------------------------------------------------------------
+history.enableWorkflowExecutionTimeouts:
+  - value: true
+    constraints: {}
+
+# Activity Configuration
+# -----------------------------------------------------------------------------
+system.enableActivityHeartbeatTimeoutResolution:
+  - value: true
+    constraints: {}
+
+# Namespace Configuration
+# -----------------------------------------------------------------------------
+system.enablePerNamespaceWorkerVersioning:
+  - value: true
+    constraints: {}
+
+# History Service Configuration
+# -----------------------------------------------------------------------------
+history.defaultActivityRetryPolicy:
+  - value:
+      initialInterval: 1s
+      maximumInterval: 100s
+      backoffCoefficient: 2.0
+      maximumAttempts: 0  # Unlimited
+    constraints: {}
+
+history.defaultWorkflowRetryPolicy:
+  - value:
+      initialInterval: 1s
+      maximumInterval: 100s
+      backoffCoefficient: 2.0
+      maximumAttempts: 0  # Unlimited
+    constraints: {}
+
+# Visibility Configuration
+# -----------------------------------------------------------------------------
+frontend.enableServerVersionCheck:
+  - value: true
+    constraints: {}
+
+# Frontend Service Configuration
+# -----------------------------------------------------------------------------
+frontend.rps:
+  - value: 2400
+    constraints: {}
+
+# Archival Configuration
+# -----------------------------------------------------------------------------
+system.enableArchivalBackfill:
+  - value: false  # Disabled for development
+    constraints: {}
+
+# Worker Configuration
+# -----------------------------------------------------------------------------
+worker.replicationTaskProcessorStartWait:
+  - value: 5s
+    constraints: {}
+
+# System Configuration
+# -----------------------------------------------------------------------------
+system.enableGlobalNamespace:
+  - value: false  # Disabled for development
+    constraints: {}
+
+# History Event Size Limits
+# -----------------------------------------------------------------------------
+limit.blobSize.error:
+  - value: 2097152  # 2MB
+    constraints: {}
+
+limit.blobSize.warn:
+  - value: 524288  # 512KB
+    constraints: {}
+
+# Persistence Configuration
+# -----------------------------------------------------------------------------
+system.transactionSizeLimit:
+  - value: 4194304  # 4MB
+    constraints: {}
+
+# Advanced Visibility Configuration
+# -----------------------------------------------------------------------------
+frontend.enableReadVisibilityFromES:
+  - value: false  # Elasticsearch disabled in dev setup
+    constraints: {}
+
+frontend.enableReadFromSecondaryVisibility:
+  - value: false
+    constraints: {}
+
+# Debugging and Development Settings
+# -----------------------------------------------------------------------------
+system.enableDebugMode:
+  - value: false  # Set to true for verbose debugging
+    constraints: {}
+
+# Rate Limiting (generous for development)
+# -----------------------------------------------------------------------------
+frontend.namespaceRPS:
+  - value: 1200
+    constraints: {}
+
+# Workflow Task Configuration
+# -----------------------------------------------------------------------------
+frontend.workflowTaskHeartbeatTimeout:
+  - value: 60s
+    constraints: {}
+
+# History Shard Configuration
+# -----------------------------------------------------------------------------
+history.timerProcessorCompleteTimerInterval:
+  - value: 60s
+    constraints: {}
+
+history.timerProcessorUpdateAckInterval:
+  - value: 30s
+    constraints: {}
+
+# Retention Configuration
+# -----------------------------------------------------------------------------
+frontend.minRetentionDays:
+  - value: 1
+    constraints: {}
+
+# Cluster Configuration
+# -----------------------------------------------------------------------------
+system.advancedVisibilityWritingMode:
+  - value: "off"  # No advanced visibility in dev
+    constraints: {}

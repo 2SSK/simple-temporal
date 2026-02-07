@@ -1,0 +1,122 @@
+# Temporal Alert Notification Channels
+# Version: 1.0
+# Purpose: Configure notification channels for Temporal alerts
+#
+# Usage: Place this file in grafana/provisioning/notifiers/ directory
+# Note: Grafana 9+ uses "Contact Points" instead of "Notification Channels"
+# This configuration is for reference - configure via Grafana UI or new Contact Points API
+
+apiVersion: 1
+
+# Legacy Notification Channels (Grafana < 9.0)
+# For Grafana 9+, configure Contact Points via UI or new provisioning format
+
+notifiers:
+  # Slack Notification Channel
+  - name: temporal-slack-alerts
+    type: slack
+    uid: temporal_slack
+    org_id: 1
+    is_default: false
+    send_reminder: true
+    frequency: 4h
+    disable_resolve_message: false
+    settings:
+      # Replace with your Slack webhook URL
+      url: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+      # Slack channel (with #)
+      recipient: "#temporal-alerts"
+      # Slack username
+      username: "Temporal Monitoring"
+      # Icon emoji
+      icon_emoji: ":temporal:"
+      # Mention users/groups on critical alerts
+      mentionChannel: "here"
+      title: |
+        [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+      text: |
+        {{ range .Alerts }}
+        **Summary**: {{ .Annotations.summary }}
+        **Description**: {{ .Annotations.description }}
+        **Severity**: {{ .Labels.severity }}
+        **Namespace**: {{ .Labels.namespace }}
+        {{ if .Labels.task_queue }}**Task Queue**: {{ .Labels.task_queue }}{{ end }}
+        {{ if .Labels.activity_type }}**Activity**: {{ .Labels.activity_type }}{{ end }}
+        **Dashboard**: http://localhost:3003/d/temporal-monitoring
+        {{ if .Annotations.runbook_url }}**Runbook**: {{ .Annotations.runbook_url }}{{ end }}
+        {{ end }}
+
+  # Email Notification Channel
+  - name: temporal-email-alerts
+    type: email
+    uid: temporal_email
+    org_id: 1
+    is_default: false
+    send_reminder: true
+    frequency: 4h
+    disable_resolve_message: false
+    settings:
+      # Email addresses (comma-separated)
+      addresses: "oncall@example.com,sre-team@example.com"
+      # Single email with all alerts
+      singleEmail: true
+
+  # PagerDuty Notification Channel
+  - name: temporal-pagerduty-critical
+    type: pagerduty
+    uid: temporal_pagerduty
+    org_id: 1
+    is_default: false
+    send_reminder: false
+    disable_resolve_message: false
+    settings:
+      # Replace with your PagerDuty Integration Key
+      integrationKey: "YOUR_PAGERDUTY_INTEGRATION_KEY"
+      # Severity mapping
+      severity: critical
+      # Auto resolve
+      autoResolve: true
+
+  # Webhook Notification Channel (Generic)
+  - name: temporal-webhook
+    type: webhook
+    uid: temporal_webhook
+    org_id: 1
+    is_default: false
+    send_reminder: false
+    disable_resolve_message: false
+    settings:
+      # Replace with your webhook endpoint
+      url: "https://your-webhook-endpoint.com/alerts"
+      # HTTP method
+      httpMethod: POST
+      # Basic auth (optional)
+      # username: "webhook_user"
+      # password: "webhook_password"
+      # Custom headers (optional)
+      # httpHeaders:
+      #   - name: "X-API-Key"
+      #     value: "your-api-key"
+
+# Contact Points (Grafana 9+ Unified Alerting)
+# Configure via Grafana UI or use the new provisioning format
+# See: https://grafana.com/docs/grafana/latest/alerting/manage-notifications/
+
+# Example Contact Point Configuration (for reference):
+# contactPoints:
+#   - orgId: 1
+#     name: temporal-slack
+#     receivers:
+#       - uid: temporal_slack_receiver
+#         type: slack
+#         settings:
+#           url: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+#           recipient: "#temporal-alerts"
+#           username: "Temporal Monitoring"
+#           icon_emoji: ":temporal:"
+#           title: |
+#             [{{ .Status }}] {{ .CommonLabels.alertname }}
+#           text: |
+#             {{ range .Alerts }}
+#             {{ .Annotations.summary }}
+#             {{ end }}

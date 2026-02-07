@@ -1,0 +1,130 @@
+# =============================================================================
+# Temporal Server Configuration - Development Environment
+# =============================================================================
+# This file configures the Temporal server for development use.
+# For production, separate configurations should be maintained.
+# =============================================================================
+
+log:
+  stdout: true
+  level: info
+  format: json
+
+global:
+  membership:
+    maxJoinDuration: 30s
+    broadcastAddress: "temporal"
+  
+  metrics:
+    prometheus:
+      framework: opentelemetry
+      listenAddress: "0.0.0.0:9090"
+      handlerPath: /metrics
+    
+  pprof:
+    port: 7936
+
+# =============================================================================
+# Persistence Layer Configuration
+# =============================================================================
+persistence:
+  defaultStore: default
+  visibilityStore: visibility
+  numHistoryShards: 4
+  
+  datastores:
+    # Default store - stores workflow execution data
+    default:
+      sql:
+        pluginName: postgres12
+        databaseName: temporal
+        connectAddr: "postgres:5432"
+        connectProtocol: tcp
+        user: temporal
+        password: temporal
+        maxConns: 100
+        maxIdleConns: 10
+        maxConnLifetime: 1h
+        connectAttributes:
+          timezone: UTC
+    
+    # Visibility store - stores workflow visibility data for queries
+    visibility:
+      sql:
+        pluginName: postgres12
+        databaseName: temporal_visibility
+        connectAddr: "postgres:5432"
+        connectProtocol: tcp
+        user: temporal
+        password: temporal
+        maxConns: 20
+        maxIdleConns: 5
+        maxConnLifetime: 1h
+        connectAttributes:
+          timezone: UTC
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+services:
+  frontend:
+    rpc:
+      grpcPort: 7233
+      membershipPort: 6933
+      bindOnLocalHost: false
+    
+    metrics:
+      prometheus:
+        timerType: histogram
+        listenAddress: "0.0.0.0:9090"
+    
+  matching:
+    rpc:
+      grpcPort: 7235
+      membershipPort: 6935
+      bindOnLocalHost: false
+  
+  history:
+    rpc:
+      grpcPort: 7234
+      membershipPort: 6934
+      bindOnLocalHost: false
+  
+  worker:
+    rpc:
+      grpcPort: 7239
+      membershipPort: 6939
+      bindOnLocalHost: false
+
+# =============================================================================
+# Cluster Metadata
+# =============================================================================
+clusterMetadata:
+  enableGlobalNamespace: false
+  failoverVersionIncrement: 10
+  masterClusterName: "active"
+  currentClusterName: "active"
+  clusterInformation:
+    active:
+      enabled: true
+      initialFailoverVersion: 1
+      rpcName: "temporal-frontend"
+      rpcAddress: "temporal:7233"
+
+# =============================================================================
+# Dynamic Configuration
+# =============================================================================
+dynamicConfigClient:
+  filepath: "/etc/temporal/config/dynamicconfig/development.yaml"
+  pollInterval: 10s
+
+# =============================================================================
+# Authorization (disabled for development)
+# =============================================================================
+authorization:
+  jwtKeyProvider:
+    keySourceURIs: []
+  permissionsClaimName: "permissions"
+  authorizer: "noop"
+  claimMapper: "default"
+

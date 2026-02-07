@@ -1,0 +1,192 @@
+# =============================================================================
+# OpenTelemetry Collector Configuration
+# =============================================================================
+# This collector receives telemetry data from Temporal workers and other
+# services, processes it, and exports to Prometheus and other backends.
+# =============================================================================
+
+# =============================================================================
+# Receivers - Data input pipelines
+# =============================================================================
+receivers:
+  # OTLP receiver for metrics, traces, and logs
+  otlp:
+    protocols:
+      # HTTP protocol (port 4318)
+      http:
+        endpoint: "0.0.0.0:4318"
+        cors:
+          allowed_origins:
+            - "http://localhost:*"
+            - "http://host.docker.internal:*"
+      
+      # gRPC protocol (port 4317)
+      grpc:
+        endpoint: "0.0.0.0:4317"
+  
+  # Prometheus receiver to scrape metrics from endpoints
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['localhost:8888']
+
+# =============================================================================
+# Processors - Data transformation and filtering
+# =============================================================================
+processors:
+  # Batch processor - batches telemetry data before exporting
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+  
+  # Memory limiter - prevents OOM by dropping data if necessary
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  
+  # Resource processor - adds/modifies resource attributes
+  resource:
+    attributes:
+      - key: service.instance.id
+        from_attribute: host.name
+        action: upsert
+      - key: deployment.environment
+        value: "development"
+        action: insert
+  
+  # Attributes processor - manipulates attributes on spans/metrics
+  attributes:
+    actions:
+      - key: environment
+        value: "development"
+        action: insert
+      - key: collector
+        value: "otel-collector"
+        action: insert
+  
+  # Filter processor - drops unwanted telemetry data
+  filter:
+    metrics:
+      exclude:
+        match_type: regexp
+        metric_names:
+          - ".*test.*"
+          - ".*debug.*"
+
+# =============================================================================
+# Exporters - Data output destinations
+# =============================================================================
+exporters:
+  # Prometheus exporter - exposes metrics for Prometheus to scrape
+  prometheus:
+    endpoint: "0.0.0.0:9464"
+    namespace: ""
+    send_timestamps: true
+    metric_expiration: 5m
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: false
+  
+  # Debug exporter - logs telemetry to stdout (useful for debugging)
+  debug:
+    verbosity: normal
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # OTLP exporter (optional - for sending to another OTEL collector)
+  # otlp:
+  #   endpoint: "remote-otel-collector:4317"
+  #   tls:
+  #     insecure: true
+
+# =============================================================================
+# Extensions - Additional functionality
+# =============================================================================
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: "0.0.0.0:13133"
+    path: "/"
+  
+  # pprof extension for profiling
+  pprof:
+    endpoint: "0.0.0.0:1777"
+  
+  # zpages extension for live debugging
+  zpages:
+    endpoint: "0.0.0.0:55679"
+
+# =============================================================================
+# Service Configuration - Pipeline definitions
+# =============================================================================
+service:
+  # Extensions to enable
+  extensions: 
+    - health_check
+    - pprof
+    - zpages
+  
+  # Telemetry configuration for the collector itself
+  telemetry:
+    logs:
+      level: info
+      development: false
+      encoding: json
+      disable_caller: false
+      disable_stacktrace: false
+      output_paths:
+        - stdout
+      error_output_paths:
+        - stderr
+      initial_fields:
+        service: "otel-collector"
+    
+    metrics:
+      level: detailed
+      address: "0.0.0.0:8888"
+  
+  # Data pipelines
+  pipelines:
+    # Metrics pipeline
+    metrics:
+      receivers: 
+        - otlp
+        - prometheus
+      processors: 
+        - memory_limiter
+        - resource
+        - attributes
+        - batch
+      exporters: 
+        - prometheus
+        - debug
+    
+    # Traces pipeline (optional - if you want distributed tracing)
+    # traces:
+    #   receivers: 
+    #     - otlp
+    #   processors: 
+    #     - memory_limiter
+    #     - resource
+    #     - attributes
+    #     - batch
+    #   exporters: 
+    #     - logging
+    #     # - jaeger
+    #     # - zipkin
+    
+    # Logs pipeline (optional)
+    # logs:
+    #   receivers: 
+    #     - otlp
+    #   processors: 
+    #     - memory_limiter
+    #     - resource
+    #     - batch
+    #   exporters: 
+    #     - logging

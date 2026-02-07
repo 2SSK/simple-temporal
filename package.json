@@ -1,32 +1,48 @@
 {
-  "name": "simple-temporal",
+  "name": "javascript",
   "version": "1.0.0",
-  "description": "Express + Temporal workflow starter with auto-loading architecture",
+  "description": "learning and practicing",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
     "dev": "nodemon server.js",
-    "worker": "node temporal/worker.js",
-    "test": "jest"
+    "worker": "node src/internals/temporal/worker.js",
+    "start": "pm2 start ecosystem.config.cjs",
+    "stop": "pm2 stop all",
+    "restart": "pm2 restart all",
+    "logs": "pm2 logs",
+    "create:module": "node scripts/create-module.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:name": "prisma migrate dev --name",
+    "db:migrate:prod": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:pull": "prisma db pull",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "db:validate": "prisma validate",
+    "db:format": "prisma format",
+    "db:seed": "prisma prisma/seed.js",
+    "db:status": "prisma migrate status",
+    "db:deploy": "npm run db:generate && npm run db:migrate:prod",
+    "db:check": "npm run db:validate && npm run db:status"
   },
-  "keywords": [
-    "express",
-    "temporal",
-    "workflows",
-    "auto-loading"
-  ],
-  "author": "SSK",
+  "keywords": [],
+  "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@temporalio/client": "^1.8.0",
-    "@temporalio/worker": "^1.8.0",
-    "@temporalio/workflow": "^1.8.0",
-    "dotenv": "^16.3.1",
+    "@prisma/adapter-pg": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "@temporalio/client": "^1.14.1",
+    "@temporalio/worker": "^1.14.1",
+    "@temporalio/workflow": "^1.14.1",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "nodemon": "^3.1.11"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0"
+    "nodemon": "^3.1.11",
+    "pg": "^8.18.0",
+    "prisma": "^7.3.0",
+    "uuid": "^13.0.0",
+    "winston": "^3.19.0",
+    "zod": "^4.3.6"
   }
 }

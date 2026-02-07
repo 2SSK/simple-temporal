@@ -1,0 +1,655 @@
+# Temporal Lag Detection Alert Rules
+# Version: 2.0
+# Purpose: Alert on activity/workflow lag and capacity issues
+#
+# Usage: Place this file in grafana/provisioning/alerting/ directory
+# Grafana will automatically load these rules on startup
+#
+# Documentation: See LAG_DETECTION_GUIDE.md for alert rationale
+
+apiVersion: 1
+
+groups:
+  # Critical Alerts - Page Immediately
+  - orgId: 1
+    name: temporal_critical_alerts
+    folder: Temporal
+    interval: 1m
+    rules:
+      # Alert: High Activity Queue Lag
+      # Triggers when activities wait > 1 second in queue (p95)
+      # Indicates: Worker capacity problem
+      # Action: Scale workers immediately
+      - uid: temporal_high_queue_lag
+        title: High Activity Queue Lag (> 1s p95)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.95,
+                  sum(rate(temporal_activity_schedule_to_start_latency_milliseconds_bucket[5m])) by (le, namespace, task_queue)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "🔴 Activities waiting > 1s in queue ({{ $labels.namespace }}/{{ $labels.task_queue }})"
+          description: |
+            **CRITICAL**: Activity Schedule-to-Start latency (p95) is {{ $value | humanize }}ms.
+            
+            **Problem**: Activities are waiting too long in queue before execution starts.
+            **Root Cause**: Insufficient worker capacity.
+            
+            **Immediate Actions**:
+            1. Scale workers: `docker-compose up -d --scale temporal-worker=N`
+            2. Check worker health: http://localhost:3003/d/temporal-monitoring
+            3. Verify worker capacity gauge is not at 95%+
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+            **Namespace**: {{ $labels.namespace }}
+            **Task Queue**: {{ $labels.task_queue }}
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-high-queue-lag.md"
+        labels:
+          severity: critical
+          component: temporal_workers
+          lag_type: queue_lag
+        isPaused: false
+
+      # Alert: Worker Capacity Critical
+      # Triggers when worker capacity > 95%
+      # Indicates: Workers completely saturated
+      # Action: Emergency scaling
+      - uid: temporal_worker_capacity_critical
+        title: Worker Capacity Critical (> 95%)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (sum(temporal_worker_task_slots_used{namespace=~"$namespace"}) /
+                 sum(temporal_worker_task_slots_available{namespace=~"$namespace"})) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 95
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "🔴 Worker capacity at {{ $value | humanize1024 }}%"
+          description: |
+            **CRITICAL**: Workers are completely saturated. System is at capacity limit.
+            
+            **Problem**: Worker task slots are 95%+ utilized.
+            **Impact**: New activities will queue, causing increased latency.
+            
+            **Emergency Actions**:
+            1. Scale workers immediately: `docker-compose up -d --scale temporal-worker=N`
+            2. Check dashboard: http://localhost:3003/d/temporal-monitoring
+            3. Verify new workers come online
+            
+            **Current Capacity**: {{ $value | humanize1024 }}%
+            **Target**: < 85%
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-worker-capacity.md"
+        labels:
+          severity: critical
+          component: temporal_workers
+          lag_type: capacity
+        isPaused: false
+
+      # Alert: High Activity Execution Latency
+      # Triggers when activity code takes > 1 second (p95)
+      # Indicates: Slow activity implementation
+      # Action: Investigate and optimize code
+      - uid: temporal_high_execution_latency
+        title: High Activity Execution Latency (> 1s p95)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.95,
+                  sum(rate(temporal_activity_execution_latency_milliseconds_bucket[5m])) by (le, namespace, task_queue, activity_type)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "🔴 Activity code taking > 1s to execute ({{ $labels.activity_type }})"
+          description: |
+            **CRITICAL**: Activity execution latency (p95) is {{ $value | humanize }}ms.
+            
+            **Problem**: Activity code is taking too long to execute.
+            **Root Cause**: Slow activity implementation or blocking operations.
+            
+            **Investigation Steps**:
+            1. Check dashboard: http://localhost:3003/d/temporal-monitoring
+            2. Profile activity code: {{ $labels.activity_type }}
+            3. Look for blocking I/O, slow DB queries, external API calls
+            
+            **Optimization Actions**:
+            • Add caching for expensive operations
+            • Optimize database queries
+            • Remove synchronous blocking calls
+            • Parallelize where possible
+            
+            **Activity**: {{ $labels.activity_type }}
+            **Namespace**: {{ $labels.namespace }}
+            **Task Queue**: {{ $labels.task_queue }}
+            **Current p95**: {{ $value | humanize }}ms
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-slow-activities.md"
+        labels:
+          severity: critical
+          component: temporal_activities
+          lag_type: code_performance
+        isPaused: false
+
+      # Alert: High End-to-End Latency
+      # Triggers when total user-facing latency > 2 seconds (p95)
+      # Indicates: Overall system slowness
+      # Action: Fix bottleneck (queue or code)
+      - uid: temporal_high_endtoend_latency
+        title: High End-to-End Activity Latency (> 2s p95)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.95,
+                  sum(rate(temporal_activity_succeed_endtoend_latency_milliseconds_bucket[5m])) by (le, namespace, task_queue)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 2000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "🔴 Total activity latency > 2s (user-facing impact)"
+          description: |
+            **CRITICAL**: End-to-end activity latency (p95) is {{ $value | humanize }}ms.
+            
+            **Problem**: Users experiencing slow activities.
+            **Impact**: Poor user experience, potential SLA violation.
+            
+            **Diagnosis**:
+            1. Open dashboard: http://localhost:3003/d/temporal-monitoring
+            2. Compare Schedule-to-Start vs Execution Latency
+            3. Fix whichever is higher:
+               - High Schedule-to-Start → Scale workers
+               - High Execution Latency → Optimize code
+            
+            **Namespace**: {{ $labels.namespace }}
+            **Task Queue**: {{ $labels.task_queue }}
+            **Current p95**: {{ $value | humanize }}ms
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-high-latency.md"
+        labels:
+          severity: critical
+          component: temporal_activities
+          lag_type: total_lag
+        isPaused: false
+
+  # Warning Alerts - Investigate Soon
+  - orgId: 1
+    name: temporal_warning_alerts
+    folder: Temporal
+    interval: 1m
+    rules:
+      # Alert: Elevated Activity Queue Lag
+      # Triggers when activities wait > 500ms in queue (p95)
+      # Indicates: Approaching capacity limits
+      # Action: Plan to scale within 15 minutes
+      - uid: temporal_elevated_queue_lag
+        title: Elevated Activity Queue Lag (> 500ms p95)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.95,
+                  sum(rate(temporal_activity_schedule_to_start_latency_milliseconds_bucket[5m])) by (le, namespace, task_queue)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 500
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "⚠️ Activities waiting > 500ms in queue ({{ $labels.namespace }}/{{ $labels.task_queue }})"
+          description: |
+            **WARNING**: Activity queue lag (p95) is {{ $value | humanize }}ms.
+            
+            **Problem**: Activities waiting longer than normal before execution.
+            **Trend**: Approaching capacity limits.
+            
+            **Actions** (within 15 minutes):
+            1. Check dashboard: http://localhost:3003/d/temporal-monitoring
+            2. Review worker capacity gauge
+            3. Plan to scale workers if capacity > 80%
+            4. Monitor trend - if increasing, scale proactively
+            
+            **Namespace**: {{ $labels.namespace }}
+            **Task Queue**: {{ $labels.task_queue }}
+            **Current p95**: {{ $value | humanize }}ms
+            **Threshold**: 500ms
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-elevated-queue-lag.md"
+        labels:
+          severity: warning
+          component: temporal_workers
+          lag_type: queue_lag
+        isPaused: false
+
+      # Alert: High Worker Capacity
+      # Triggers when worker capacity > 85%
+      # Indicates: Approaching saturation
+      # Action: Prepare to scale
+      - uid: temporal_high_worker_capacity
+        title: High Worker Capacity (> 85%)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (sum(temporal_worker_task_slots_used{namespace=~"$namespace"}) /
+                 sum(temporal_worker_task_slots_available{namespace=~"$namespace"})) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "⚠️ Worker capacity at {{ $value | humanize1024 }}%"
+          description: |
+            **WARNING**: Worker capacity approaching saturation.
+            
+            **Problem**: Workers are 85%+ utilized.
+            **Risk**: May hit capacity limits soon, causing queue lag.
+            
+            **Actions**:
+            1. Check dashboard: http://localhost:3003/d/temporal-monitoring
+            2. Monitor Schedule-to-Start latency
+            3. Prepare to scale workers
+            4. If trend increasing, scale proactively
+            
+            **Current Capacity**: {{ $value | humanize1024 }}%
+            **Target**: < 70%
+            **Critical Threshold**: 95%
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-worker-capacity.md"
+        labels:
+          severity: warning
+          component: temporal_workers
+          lag_type: capacity
+        isPaused: false
+
+      # Alert: Elevated Activity Execution Latency
+      # Triggers when activity code takes > 500ms (p95)
+      # Indicates: Slower than target performance
+      # Action: Review activity performance
+      - uid: temporal_elevated_execution_latency
+        title: Elevated Activity Execution Latency (> 500ms p95)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.95,
+                  sum(rate(temporal_activity_execution_latency_milliseconds_bucket[5m])) by (le, namespace, task_queue, activity_type)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 500
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: "⚠️ Activity execution latency elevated ({{ $labels.activity_type }})"
+          description: |
+            **WARNING**: Activity execution latency (p95) is {{ $value | humanize }}ms.
+            
+            **Problem**: Activity code slower than target (> 500ms).
+            **Trend**: May need optimization.
+            
+            **Actions**:
+            1. Check dashboard: http://localhost:3003/d/temporal-monitoring
+            2. Review activity code: {{ $labels.activity_type }}
+            3. Look for optimization opportunities
+            4. Monitor trend - if increasing, prioritize optimization
+            
+            **Activity**: {{ $labels.activity_type }}
+            **Namespace**: {{ $labels.namespace }}
+            **Task Queue**: {{ $labels.task_queue }}
+            **Current p95**: {{ $value | humanize }}ms
+            **Target**: < 100ms
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-slow-activities.md"
+        labels:
+          severity: warning
+          component: temporal_activities
+          lag_type: code_performance
+        isPaused: false
+
+      # Alert: Workflow Processing Latency High
+      # Triggers when workflow task processing > 200ms (p95)
+      # Indicates: Slow workflow code
+      # Action: Optimize workflow logic
+      - uid: temporal_wf_latency_high
+        title: High Workflow Processing Latency (> 200ms p95)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.95,
+                  sum(rate(temporal_request_latency_milliseconds_bucket{operation="RespondWorkflowTaskCompleted"}[5m])) by (le, namespace)
+                )
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 200
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: "⚠️ Workflow processing taking > 200ms ({{ $labels.namespace }})"
+          description: |
+            **WARNING**: Workflow task processing latency (p95) is {{ $value | humanize }}ms.
+            
+            **Problem**: Workflow code taking longer than target.
+            **Impact**: Slower workflow progress.
+            
+            **Investigation**:
+            1. Check dashboard: http://localhost:3003/d/temporal-monitoring
+            2. Review workflow complexity
+            3. Check workflow history size
+            4. Look for heavy computations in workflow code
+            
+            **Optimization**:
+            • Move heavy operations to activities
+            • Reduce workflow complexity
+            • Minimize workflow history
+            
+            **Namespace**: {{ $labels.namespace }}
+            **Current p95**: {{ $value | humanize }}ms
+            **Target**: < 50ms
+            
+            **Dashboard**: http://localhost:3003/d/temporal-monitoring
+          runbook_url: "https://github.com/your-org/runbooks/blob/main/temporal-slow-workflows.md"
+        labels:
+          severity: warning
+          component: temporal_workflows
+          lag_type: workflow_performance
+        isPaused: false

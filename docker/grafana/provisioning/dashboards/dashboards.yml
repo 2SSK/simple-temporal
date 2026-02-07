@@ -1,8 +1,0 @@
-apiVersion: 1
-
-providers:
-  - name: 'Temporal Dashboards'
-    type: file
-    options:
-      path: /etc/grafana/provisioning/dashboards
-      foldersFromFilesStructure: true

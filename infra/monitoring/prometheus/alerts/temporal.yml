@@ -1,0 +1,238 @@
+# =============================================================================
+# Temporal Infrastructure Alert Rules
+# =============================================================================
+# These alerts monitor the health and performance of Temporal infrastructure
+# =============================================================================
+
+groups:
+  # ===========================================================================
+  # Service Availability Alerts
+  # ===========================================================================
+  - name: service_availability
+    interval: 30s
+    rules:
+      - alert: TemporalServerDown
+        expr: up{job="temporal-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: temporal
+        annotations:
+          summary: "Temporal server is down"
+          description: "Temporal server {{ $labels.instance }} has been down for more than 1 minute."
+          
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance {{ $labels.instance }} is unreachable."
+      
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus instance {{ $labels.instance }} is down."
+
+  # ===========================================================================
+  # Temporal Workflow Alerts
+  # ===========================================================================
+  - name: temporal_workflows
+    interval: 1m
+    rules:
+      - alert: HighWorkflowFailureRate
+        expr: |
+          (
+            rate(temporal_workflow_failed_total[5m])
+            /
+            rate(temporal_workflow_completed_total[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: temporal
+        annotations:
+          summary: "High workflow failure rate"
+          description: "Workflow failure rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+      
+      - alert: WorkflowExecutionLatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            rate(temporal_workflow_endtoend_latency_bucket[5m])
+          ) > 60000
+        for: 10m
+        labels:
+          severity: warning
+          component: temporal
+        annotations:
+          summary: "High workflow execution latency"
+          description: "P95 workflow latency is {{ $value }}ms, exceeding 60s threshold."
+      
+      - alert: StuckWorkflows
+        expr: |
+          temporal_workflow_endtoend_latency_count - 
+          temporal_workflow_endtoend_latency_count offset 1h == 0
+        for: 30m
+        labels:
+          severity: warning
+          component: temporal
+        annotations:
+          summary: "Workflows appear stuck"
+          description: "No workflow progress in the last hour."
+
+  # ===========================================================================
+  # Task Queue Alerts
+  # ===========================================================================
+  - name: temporal_task_queues
+    interval: 1m
+    rules:
+      - alert: TaskQueueBacklog
+        expr: temporal_task_queue_depth > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: temporal
+        annotations:
+          summary: "Task queue backlog detected"
+          description: "Task queue {{ $labels.task_queue }} has {{ $value }} pending tasks."
+      
+      - alert: TaskQueueLatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            rate(temporal_task_schedule_to_start_latency_bucket[5m])
+          ) > 5000
+        for: 10m
+        labels:
+          severity: warning
+          component: temporal
+        annotations:
+          summary: "High task scheduling latency"
+          description: "P95 task scheduling latency is {{ $value }}ms."
+
+  # ===========================================================================
+  # Database Performance Alerts
+  # ===========================================================================
+  - name: database_performance
+    interval: 1m
+    rules:
+      - alert: HighDatabaseConnections
+        expr: |
+          pg_stat_database_numbackends
+          / 
+          pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connections at {{ $value | humanizePercentage }} of max_connections."
+      
+      - alert: SlowDatabaseQueries
+        expr: |
+          rate(pg_stat_database_blks_read[5m])
+          /
+          rate(pg_stat_database_blks_hit[5m]) < 0.9
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Low database cache hit ratio"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }}, indicating slow queries."
+      
+      - alert: DatabaseDiskSpaceHigh
+        expr: |
+          (
+            pg_database_size_bytes
+            /
+            node_filesystem_size_bytes{mountpoint="/var/lib/postgresql/data"}
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database disk space critical"
+          description: "Database disk usage is at {{ $value | humanizePercentage }}."
+
+  # ===========================================================================
+  # Resource Usage Alerts
+  # ===========================================================================
+  - name: resource_usage
+    interval: 1m
+    rules:
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{name=~"temporal.*"}
+            /
+            container_spec_memory_limit_bytes{name=~"temporal.*"}
+          ) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value | humanizePercentage }}."
+      
+      - alert: HighCPUUsage
+        expr: |
+          rate(container_cpu_usage_seconds_total{name=~"temporal.*"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "High CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}%."
+
+  # ===========================================================================
+  # Prometheus Self-Monitoring
+  # ===========================================================================
+  - name: prometheus_health
+    interval: 1m
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Prometheus target down"
+          description: "Target {{ $labels.job }} on {{ $labels.instance }} is down."
+      
+      - alert: PrometheusHighCardinality
+        expr: |
+          prometheus_tsdb_symbol_table_size_bytes > 100000000
+        for: 10m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "High metric cardinality"
+          description: "Prometheus symbol table is {{ $value | humanize }}B, indicating high cardinality."
+      
+      - alert: PrometheusDiskSpaceLow
+        expr: |
+          (
+            prometheus_tsdb_storage_blocks_bytes
+            /
+            node_filesystem_size_bytes{mountpoint="/prometheus"}
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Prometheus disk space low"
+          description: "Prometheus storage is at {{ $value | humanizePercentage }} capacity."
