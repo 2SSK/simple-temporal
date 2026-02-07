@@ -4,11 +4,7 @@ A production-ready Node.js microservice template demonstrating integration betwe
 
 ## Preview
 
-https://github.com/user-attachments/assets/preview.mp4
-
-<video src="./preview.mp4" controls width="100%" height="400">
-  Your browser does not support the video tag.
-</video>
+![Preview](preview.gif)
 
 ## Quick Start
 
